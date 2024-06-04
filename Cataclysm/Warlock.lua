@@ -364,6 +364,13 @@ spec:RegisterAuras( {
         duration = 3600,
         max_stack = 1,
     },
+    -- Felstorm.
+    felstorm = {
+        id = 89751,
+        duration = 6,
+        tick_time = 1,
+        max_stack = 1,
+    },
     -- Damage taken from Shadow damage-over-time effects increased by $s3%.
     haunt = {
         id = 48181,
@@ -599,6 +606,12 @@ spec:RegisterAuras( {
         duration = 6,
         max_stack = 1,
     },
+    -- Soul Link
+    soul_link = {
+        id = 25228,
+        duration = 3600,
+        max_stack = 1
+    },
     -- Enslaved.
     subjugate_demon = {
         id = 1098,
@@ -683,6 +696,41 @@ spec:RegisterAuras( {
         alias = { "fel_armor", "demon_armor", "demon_skin" },
         aliasMode = "first",
         aliasType = "buff"
+    },
+
+    -- Spell Damage Debuffs for Curse of the Elements handler
+    -- Ebon Plaguebringer
+    ebon_plaguebringer = {
+        id = 65142,
+        duration = 21,
+        max_stack = 1,
+        shared = "target"
+    },
+    -- Earth and Moon
+    earth_and_moon = {
+        id = 60433,
+        duration = 15,
+        max_stack = 1,
+        shared = "target"
+    },
+    -- Master Poisoner
+    master_poisoner = {
+        id = 58410,
+        duration = 3600,
+        max_stack = 1,
+        shared = "target"
+    },
+    -- Fire Breath
+    fire_breath = {
+        id = 34889,
+        duration = 45,
+        max_stack = 1,
+        shared = "target"
+    },
+    spell_damage_debuffs = {
+        alias = {"curse_of_the_elements", "ebon_plaguebringer", "earth_and_moon", "master_poisoner", "fire_breath"},
+        aliasMode = "first",
+        aliasType = "debuff"
     }
 } )
 
@@ -799,18 +847,18 @@ end )
 
 local aliasesSet = {}
 
-spec:RegisterStateExpr( "soul_shards", function()
-    return GetItemCount( 6265 )
-end )
+spec:RegisterStateExpr("soul_shards", function()
+    return UnitPower("player", SPELL_POWER_SOUL_SHARDS)
+end)
 
 spec:RegisterHook( "reset_precast", function()
-    if settings.solo_curse == "bane_of_doom" and target.time_to_die < 65 then
+    if settings.solo_curse == "bane_of_doom" and target.time_to_die < 30 then
         class.abilities.solo_curse = class.abilities.bane_of_agony
     else
         class.abilities.solo_curse = class.abilities[ settings.solo_curse or "bane_of_agony" ]
     end
 
-    if settings.group_curse == "bane_of_doom" and target.time_to_die < 65 then
+    if settings.group_curse == "bane_of_doom" and target.time_to_die < 30 then
         class.abilities.group_curse = class.abilities.bane_of_agony
     else
         class.abilities.group_curse = class.abilities[ settings.group_curse or "curse_of_the_elements" ]
@@ -1411,6 +1459,25 @@ spec:RegisterAbilities( {
             if dot.immolate.ticking then dot.immolate.expires = dot.immolate.expires + 6 end
             if dot.unstable_affliction.ticking then dot.unstable_affliction.expires = dot.unstable_affliction.expires + 6 end
         end,
+    },
+
+    -- Felstorm ability definition
+    felstorm = {
+        id = 89751,
+        cast = 0,
+        cooldown = 45,
+        gcd = "off",
+
+        spend = 0,
+        spendType = "none",
+
+        startsCombat = true,
+        texture = 236303,
+
+        handler = function()
+            -- Felstorm starts
+            applyBuff("felstorm")
+        end
     },
 
     -- Summons a falling meteor down upon the enemy target, dealing $71521s1 Shadowflame damage and erupts an aura of magic within $86000a1 yards, causing all targets within it to have a $86000s1% increased  chance to be critically hit by any Warlock demons. The aura lasts for $86041d.
@@ -2032,19 +2099,21 @@ spec:RegisterAbilities( {
         end,
     },
 
-    --Summons a Doomguard to fight beside you for 45 sec.The Doomguard will assist you by attacking the target which is afflicted by your Bane of Doom or Bane of Agony spell.
+    -- Summons a Doomguard to fight beside you for 45 sec.The Doomguard will assist you by attacking the target which is afflicted by your Bane of Doom or Bane of Agony spell.
     summon_doomguard = {
         id = 18540,
         cast = 0,
         cooldown = 600,
         gcd = "spell",
 
-        spend = function() return 0.8 * ( buff.fel_domination.up and 0.5 or 1 ) * ( 1 - 0.5 * talent.master_summoner.rank ) end,
+        spend = 0.8,
         spendType = "mana",
 
         startsCombat = false,
         texture = 236418,
-        
+
+        toggle = "cooldowns",
+
         handler = function()
             summonPet( "doomguard" )
 			dismissPet( "infernal" )
@@ -2056,67 +2125,81 @@ spec:RegisterAbilities( {
     summon_felguard = {
         id = 30146,
         cast = function()
-            if buff.soulburn.up then return 0 end
-            return ( 6 - ( 1 * talent.master_summoner.rank ) - ( buff.fel_domination.up and 5.5 or 0 ) ) * ( buff.demonic_rebirth.up and 0.5 or 1 )
+            if buff.soulburn.up then
+                return 0
+            end
+            local base_cast_time = 6
+            local master_summoner_reduction = talent.master_summoner.rank * 0.5
+            local demonic_rebirth_reduction = buff.demonic_rebirth.up and 0.5 or 1
+            return (base_cast_time - master_summoner_reduction) * demonic_rebirth_reduction
         end,
         cooldown = 0,
         gcd = "spell",
 
-        spend = function() return 0.8 * ( buff.fel_domination.up and 0.5 or 1 ) * ( 1 - 0.5 * talent.master_summoner.rank ) end,  
+        spend = function()
+            return 0.8 * (1 - 0.5 * talent.master_summoner.rank)
+        end,
         spendType = "mana",
 
         startsCombat = false,
         texture = 136216,
-        talent = "summon_felguard",
 
-        usable = function() return soul_shards > 0, "requires a soul_shard" end,
+        usable = function()
+            return soul_shards > 0, "requires a soul_shard"
+        end,
 
         handler = function()
-            removeBuff( "soulburn" )
-            removeBuff( "fel_domination" )
-            removeBuff( "demonic_rebirth" )
+            removeBuff("soulburn")
+            removeBuff("demonic_rebirth")
 
-            dismissPet( "imp" )
-            dismissPet( "voidwalker" )
-            dismissPet( "felhunter" )
-            dismissPet( "succubus" )
-            summonPet( "felguard" )
+            dismissPet("imp")
+            dismissPet("voidwalker")
+            dismissPet("felhunter")
+            dismissPet("succubus")
+            summonPet("felguard")
 
-            soul_shards = max( 0, soul_shards - 1 )
-        end,
+            soul_shards = max(0, soul_shards - 1)
+        end
     },
-    --Summons a Felhunter under the command of the Warlock.SoulburnSoulburn: Instant cast. In the Demonology Abilities category. Learn how to use this in our class guide.
+    -- Summons a Felhunter under the command of the Warlock.SoulburnSoulburn: Instant cast. In the Demonology Abilities category. Learn how to use this in our class guide.
     summon_felhunter = {
         id = 691,
         cast = function()
-            if buff.soulburn.up then return 0 end
-            return ( 6 - ( 1 * talent.master_summoner.rank ) - ( buff.fel_domination.up and 5.5 or 0 ) ) * ( buff.demonic_rebirth.up and 0.5 or 1 )
+            if buff.soulburn.up then
+                return 0
+            end
+            local base_cast_time = 6
+            local master_summoner_reduction = talent.master_summoner.rank * 0.5
+            local demonic_rebirth_reduction = buff.demonic_rebirth.up and 0.5 or 1
+            return (base_cast_time - master_summoner_reduction) * demonic_rebirth_reduction
         end,
         cooldown = 0,
         gcd = "spell",
 
-        spend = function() return 0.8 * ( buff.fel_domination.up and 0.5 or 1 ) * ( 1 - 0.5 * talent.master_summoner.rank ) end, 
+        spend = function()
+            return 0.8 * (1 - 0.5 * talent.master_summoner.rank)
+        end,
         spendType = "mana",
 
         startsCombat = false,
         texture = 136217,
 
-        usable = function() return soul_shards > 0, "requires a soul_shard" end,
-
-        
-        handler = function()
-            removeBuff( "soulburn" )
-            removeBuff( "fel_domination" )
-            removeBuff( "demonic_rebirth" )
-
-            dismissPet( "imp" )
-            dismissPet( "voidwalker" )
-            summonPet( "felhunter" )
-            dismissPet( "succubus" )
-            dismissPet( "felguard" )
-
-            soul_shards = max( 0, soul_shards - 1 )
+        usable = function()
+            return soul_shards > 0, "requires a soul_shard"
         end,
+
+        handler = function()
+            removeBuff("soulburn")
+            removeBuff("demonic_rebirth")
+
+            dismissPet("imp")
+            dismissPet("voidwalker")
+            summonPet("felhunter")
+            dismissPet("succubus")
+            dismissPet("felguard")
+
+            soul_shards = max(0, soul_shards - 1)
+        end
 
     },
 
@@ -2124,29 +2207,35 @@ spec:RegisterAbilities( {
     summon_imp = {
         id = 688,
         cast = function()
-            if buff.soulburn.up then return 0 end
-            return ( 6 - ( 1 * talent.master_summoner.rank ) - ( buff.fel_domination.up and 5.5 or 0 ) ) * ( buff.demonic_rebirth.up and 0.5 or 1 )
+            if buff.soulburn.up then
+                return 0
+            end
+            local base_cast_time = 6
+            local master_summoner_reduction = talent.master_summoner.rank * 0.5
+            local demonic_rebirth_reduction = buff.demonic_rebirth.up and 0.5 or 1
+            return (base_cast_time - master_summoner_reduction) * demonic_rebirth_reduction
         end,
         cooldown = 0,
         gcd = "spell",
 
-        spend = function() return 0.64 * ( buff.fel_domination.up and 0.5 or 1 ) * ( 1 - 0.5 * talent.master_summoner.rank ) end, 
+        spend = function()
+            return 0.8 * (1 - 0.5 * talent.master_summoner.rank)
+        end,
         spendType = "mana",
 
         startsCombat = false,
         texture = 136218,
-        
-        handler = function()
-            removeBuff( "soulburn" )
-            removeBuff( "fel_domination" )
-            removeBuff( "demonic_rebirth" )
 
-            summonPet( "imp" )
-            dismissPet( "voidwalker" )
-            dismissPet( "felhunter" )
-            dismissPet( "succubus" )
-            dismissPet( "felguard" )
-        end,
+        handler = function()
+            removeBuff("soulburn")
+            removeBuff("demonic_rebirth")
+
+            summonPet("imp")
+            dismissPet("voidwalker")
+            dismissPet("felhunter")
+            dismissPet("succubus")
+            dismissPet("felguard")
+        end
 
     },
 
@@ -2154,13 +2243,20 @@ spec:RegisterAbilities( {
     summon_incubus = {
         id = 713,
         cast = function()
-            if buff.soulburn.up then return 0 end
-            return ( 6 - ( 1 * talent.master_summoner.rank ) - ( buff.fel_domination.up and 5.5 or 0 ) ) * ( buff.demonic_rebirth.up and 0.5 or 1 )
+            if buff.soulburn.up then
+                return 0
+            end
+            local base_cast_time = 6
+            local master_summoner_reduction = talent.master_summoner.rank * 0.5
+            local demonic_rebirth_reduction = buff.demonic_rebirth.up and 0.5 or 1
+            return (base_cast_time - master_summoner_reduction) * demonic_rebirth_reduction
         end,
         cooldown = 0,
         gcd = "spell",
 
-        spend = function() return 0.8 * ( buff.fel_domination.up and 0.5 or 1 ) * ( 1 - 0.5 * talent.master_summoner.rank ) end, 
+        spend = function()
+            return 0.8 * (1 - 0.5 * talent.master_summoner.rank)
+        end,
         spendType = "mana",
 
         startsCombat = false,
@@ -2195,6 +2291,8 @@ spec:RegisterAbilities( {
         startsCombat = true,
         texture = 136219,
 
+        toggle = "cooldowns",
+
         handler = function()
             dismissPet( "doomguard" )
 			summonPet( "infernal" )
@@ -2205,13 +2303,20 @@ spec:RegisterAbilities( {
     summon_succubus = {
         id = 712,
         cast = function()
-            if buff.soulburn.up then return 0 end
-            return ( 6 - ( 1 * talent.master_summoner.rank ) - ( buff.fel_domination.up and 5.5 or 0 ) ) * ( buff.demonic_rebirth.up and 0.5 or 1 )
+            if buff.soulburn.up then
+                return 0
+            end
+            local base_cast_time = 6
+            local master_summoner_reduction = talent.master_summoner.rank * 0.5
+            local demonic_rebirth_reduction = buff.demonic_rebirth.up and 0.5 or 1
+            return (base_cast_time - master_summoner_reduction) * demonic_rebirth_reduction
         end,
         cooldown = 0,
         gcd = "spell",
 
-        spend = function() return 0.8 * ( buff.fel_domination.up and 0.5 or 1 ) * ( 1 - 0.5 * talent.master_summoner.rank ) end,  
+        spend = function()
+            return 0.8 * (1 - 0.5 * talent.master_summoner.rank)
+        end,
         spendType = "mana",
 
         startsCombat = false,
@@ -2238,13 +2343,20 @@ spec:RegisterAbilities( {
     summon_voidwalker = {
         id = 697,
         cast = function()
-            if buff.soulburn.up then return 0 end
-            return ( 6 - ( 1 * talent.master_summoner.rank ) - ( buff.fel_domination.up and 5.5 or 0 ) ) * ( buff.demonic_rebirth.up and 0.5 or 1 )
+            if buff.soulburn.up then
+                return 0
+            end
+            local base_cast_time = 6
+            local master_summoner_reduction = talent.master_summoner.rank * 0.5
+            local demonic_rebirth_reduction = buff.demonic_rebirth.up and 0.5 or 1
+            return (base_cast_time - master_summoner_reduction) * demonic_rebirth_reduction
         end,
         cooldown = 0,
         gcd = "spell",
 
-        spend = function() return 0.8 * ( buff.fel_domination.up and 0.5 or 1 ) * ( 1 - 0.5 * talent.master_summoner.rank ) end,  
+        spend = function()
+            return 0.8 * (1 - 0.5 * talent.master_summoner.rank)
+        end,
         spendType = "mana",
 
         startsCombat = false,
@@ -2313,11 +2425,11 @@ spec:RegisterAbilities( {
 
 local curses = {}
 
-spec:RegisterSetting( "solo_curse", "bane_of_agony", {
+spec:RegisterSetting("solo_curse", "bane_of_doom", {
     type = "select",
     name = "Preferred Curse when Solo",
-    desc = "Select the Curse you'd like to use when playing solo.  It is referenced as |cff00ccff[Solo Curse]|r in your priority.\n\n"
-        .. "If Curse of Doom is selected and your target is expected to die in fewer than 65 seconds, Curse of Agony will be used instead.",
+    desc = "Select the Curse you'd like to use when playing solo.  It is referenced as |cff00ccff[Solo Curse]|r in your priority.\n\n" ..
+        "If Bane of Doom is selected and your target is expected to die in fewer than 30 seconds, Bane of Agony will be used instead.",
     width = "full",
     values = function()
         table.wipe( curses )
@@ -2335,13 +2447,13 @@ spec:RegisterSetting( "solo_curse", "bane_of_agony", {
         Hekili.DB.profile.specs[ 9 ].settings.solo_curse = val
         class.abilities.solo_curse = class.abilities[ val ]
     end,
-} )
+})
 
-spec:RegisterSetting( "group_curse", "curse_of_the_elements", {
+spec:RegisterSetting("group_curse", "bane_of_doom", {
     type = "select",
     name = "Preferred Curse when Grouped",
-    desc = "Select the Curse you'd like to use when playing in a group.  It is referenced as |cff00ccff[Group Curse]|r in your priority.\n\n"
-        .. "If Curse of Doom is selected and your target is expected to die in fewer than 65 seconds, Curse of Agony will be used instead.",
+    desc = "Select the Curse you'd like to use when playing in a group.  It is referenced as |cff00ccff[Group Curse]|r in your priority.\n\n" ..
+        "If Bane of Doom is selected and your target is expected to die in fewer than 30 seconds, Bane of Agony will be used instead.",
     width = "full",
     values = function()
         table.wipe( curses )
@@ -2414,7 +2526,7 @@ spec:RegisterOptions( {
 
 spec:RegisterPack( "Affliction", 20230226, [[Hekili:DRvwVrkoq4FlJgj0UkjmaD6CSIULM9HvAYoA0kX8mGdTjTv4sG7otl1IF7BzmnymMJC0AL2xMjbB)vhUQVQCP4A6(txNnik29hwgwlmSSUv3000WWY1HEid76KHcEg9e8djOy4F)AyyejGsstylDikfTHbrr6U8ayzxNh3rIOFlX9r14A66G2r3MM7683KO0axNTKnBW89JlGFNT)RmSUY62)O0)Vi)Q0)7KqCP)przL(rPprck9PPL(jP0s)CCyoUyBP)lFb(0trhYGFgb63ESURtePGwWuViab4))rL5IQv)nyeDRxqkjY1bNGEmcVX9pDPGg3zx5isIxfaD2fLbqiAxeTb42LDcYjuCobXXzp2dNGJj4Is)vL(ML(AGnGYFct13Irr0T6zbG1SU036MwrNVlXJ)ZEmlHBpE87HcAJMolXAx6FDLyLxy9hJ(GsXmfAXSvia7fFaYTadcce81dkyf4BpF8X)chSJwzBlhueYyVCEyxfuvfjLLJdsJFePmw6euH4ipuEml1HLPKtY4F)R)Z3l93Vq)ADZRm1VrFzP)Nf1Uh3fgQxDq9nPVKu6F8yPVWhZXXqiopgX8oJXJR(uPFg4n53Mv3FCfVkW2Ovzl2fhd2mOZB3LaND8GJxjQ7tjBEbf9mh2HV6FLWsIZg)EUIFrNDT5rrz617Pc4k)zZkm)Cl8N(md8Be5wYs5)Fh2NBhjsocNq1b1mpDpEJxXweiiVhtJOD0LcmLssEQqVEdXOcaHdvRTbxPPDxrsFfWLhEEkjqMbvP(3H9Cxb2du)4cPnnCOWMuQ(UKckBjput1MorPbGA7rjX87u2j2IGOS29SUZEUaizYr7H0NMFpcknLeWDjSp6rt92qG1wZ4NfYFvOktgZrjbpd(FEIMcTZE1mvVw1OcHXdoLfCgoVa4AGigVyOkfjlIGZRCnmvkinpFxfbIEw7YTcSD9MOw1xx84P4dEb7YlW1mmQ8QwxlGoBVEPHEONstomEuFmkb1qTAAWnUzNjkg2SuDk5DdNWjAdmPlycBpWCWzq5hGFpahHZrN8w3ZaKWy9yUqpsidPGNlwVYu736fpyVQjw4cH4GlQJboECImc7vCvs5EAHUgoT6YHcMgOwlbPO4Iu5MTU(3L7oc6(lQx3rSocgTZOZ(fRCvmfX2obhcIyhGzNfmTfuRF519RoMQZZurKngVX8e2IHfMmRZaPtVB5itY0LfAEWpIptMnrvW0K9VTuHEmkpIeRxt8tDfKrR5uVNU(5EllrZROzBqXxmsD2IjElHif)G1YpBfbgUPWUC9L(3BmlEYXBc49usFYluBz06vX9Su4FM2WBUUF7ZPKVsmxEMDmJ0IGYuJj1eypc0gVPwhu5lynFDJrf8TfGyp4K)nssiopj17eEnYTEHXByqvr0Xu97)VR4OPbt29ixDDSfFASYo8nhMHQgVnaNdkjOURjdzkVWi27FzincNYz7XodhRBne38pmxi(QgXfLB7PAGeJYI)k9rd1fdtqSGPoDZ0ie5kpnJBrmNsvb0HjLp3HKvUV9ScwWc1Jn04oxNxq5jSByxNVfNLMtzWFlV2Ak8wJQH8Px(a4rYWbSCkhiKjKeHDD(CPVQPJu(a)Wf6ndE5IvFPz(kxscxjn0KJh7pWeBZ7muJK8Wpya(P2jrOX34QXpD7qoEthhsCEDN70nb7uQVv16pKd1qXzngq9AZDysAgP5AdKIRn8SmkFOr4GiLMb3LSPVTQOs8DttG3N1JqCT1ntIf8uN(GzFTw3pS(nIolrVp8Rx82qREwoCFV05TNX5zx)SdlEQLc(B9c2TClPuvqynJZa3y1RE8OYUvxpCNQscDGwnRmvHxWEVH05u0gc7m96Bz9OpuxBQ3P37T4YQptwIUl(t)7oSGrvH5zxn3gkEDV5Y3Tz0TlhLoYPKH2jvuc66EWeIDf0D7v3yODQg1AldnPw5MwnvnkRUhsKJ8KOSnnoECweMN8GlLqLtxEzV0XvI5J8Tk0BGGx4uReGQOC)Nr22(rfwdRcI0e18qkQw0UsZ0JvU4WzTZk8v71MFlnYmv60SsHhFEFQGvnB67HVua7zLhOjncqvi9HNCi4xNfZUTPs9QDSsxkou2v))AMSDkbdoQxjzr9j69MIl78gHvMkBerbDnhVpSqIwKHET(ibUlSJy39gXj3x0305iPIDAAixmgKszQVt04uvtdYOwPqQLItPO)YEECPcuQhs7K9lm8Wz7ZYl1vU9cXOlwicZUA(tdP)sT)9GWEWQ7)c]] )
 
-spec:RegisterPack( "Demonology (wowtbc.gg)", 20230625, [[Hekili:TI12UTnoq0VLIcySlAI8LCTfj5HfDxGMTBEXfOVjjAkkjctjkqsfddeOV9DiPUqjl54K2xILiN5mdN5Wzgf)L()WFDesr8FA1IvxS46vx5T8QfxV8w)1Q9fe)1fi8wuc8qokd(7xjz8CoJNSVk8p2X3P2G9ss(tTC7zCuKgpjVuGbztvQc5xMpVvm4jfB7CmdjLNNusJiY5rTaE(oKGXXBN7VEtjLP(wU)MHohaEbb7)0Nb0PrreRiej2F9psPYQWcbLlOkW72HGx3bpRi5vHBqssuvihEuLsGnA8PQWFkqQuyR46T(ofdV(V0CypJt6v9y1JAp48fRoF1nFPkSk8VZLLcqyfsKquaEugRkKrFgwJXZticnAOgZHrsqifntB6uTdjiyEwgjpYyN18sq9)HkCn21NV6kJX(p0wIRmaEPe82QWyoyMVsW0mKIQpBBkJHJH(a54aigjx55VMrLkPobH4e4NNmjFsoAdJe5)x(RXqWIiOiqaScojbKCsgLaHXhQcVWUkp3FDgrHY4IIuUKk9vq2zsG(qvyzrNM0SmoZ4QbOsbsR7fVtNqMII47IzAwjaZLVxyiKOaECaMleLfM1a0UAaAns7iv)dPII3AsKZQchAW7QcVeeFpMrcS0fPo2dM56jmtDyI87Wik99Jyujt1MYBmJ5QhfhqYk47icGmQCDNMeBJ4fC7V9Ky603ah26uE6RabkEqeLysfrCLxZX1lc4ewBCqK4OP4iIM37LTpaxkKao8D5gJAEnirWllaDAr1SGv2XY2hhyhUdu2QdLHjZ3tKOJFnsSOpf9MjnxmnjvfiiziAULVVA5IQWxEbkpWLsJpmqgn7zXrUGFRlpOecPGTYKdOcFEspYgeDb1RSWnwebvMq5yBG42bm0aCQwkTjwU4xOsZY3u9ULq(vjOyTIo5aeJfyFjqxo1wunW2Buxwvl(0LdRlftZke8NHcp2IybB4mLxTcMWsnVRE7mO5brS3ZnDPBOey7N8jibpSUObsJZm9f0e2(IupgnwxXOON9nwVDN(S(MLnOFPlXOpTPp5y50xYmglQTj2aQXWRjThC37HLSGyOVOXqtFp0sdHadjxxVN41JWKJP5erDTML34EWCJP9owWRfMg5BqQJ3r1yBKacpdcNXeGqPx)vBKwardlr1XZkZ03qaqskrIOxTI8rW4zonAhITLioEX2JJcqTpEj1FdSURF1UstxC8eUbooXYKSFMiK6DCMhfgAnhQSd89VbTrfk9z5cB)z9azMzUGz60efEmLbrSp(r9mBDJr)t7yVvpQ3y1vvHpwMdCDTj0ZcArs61s0(09ZBjnNrJVFa1ACngqu069HU04r1PJy8w0cIWNK4njwTWJZnMDiVyCOSuHj8QMuP2oNajWjYdApYKsUBpWWWknZTycb1n)NDyfThgD8hxGCgvrJ1ydKmR3uoUk3nGYu66kD38fNIxpYOkUG1RxGgVEtC8amrYlVONgzwV1V7YfUG0oPXb5I6zcAP)dhUy2GblE42rYo06HdmhxORJBSyqF(Z0D4VhAWFMDOG7xQvYYRBgB4HL9I9DCQtKYn7OD9VRTX3Nw5ANFT7pdZu9zpoxzoSj9yeJUPsCJ2TDw7sx9AcpryZT4he5hJunibCXqfELeDTuoFk5Pa6HFY4POLJ09(knltQ92wFyU7YjorK3eiqhTsvkmIX62)ThM(z())d]] )
+spec:RegisterPack( "Demonology", 20230625, [[Hekili:TE1sVnUnq4FllwGf7IgR4xjTzRZEOTxskqU402dfRePLOTjcfPajvCnqa)T3zOEllfNaSxsugoV4mFZWVeol8XW1jull8H5tNVC61txemD6YzlxgU2EmJfUoJg)eDh8HKMc)8pyPkPsO2Dep6Oqrtqxyu56y449wBM5RxE5Hdhc4XhN8mJlnbXQ0lJPwAS4OjDsSGAm84ltQD1KduTqf)0KSNzt2LZtapTjNlS3jd3mA(zYyXHpCdeuEscRqtMjoC9J75ghjtZvAU9OJCGc)5b4Blt6iBOgwIJOGpT7zoYDXGk)nMNoYVxLKoIpnccxl4gRbVIufd(1d(kgn2YvYW1BzcJvPtdxZK0ncws4VfAHuTTo7PYKi12OD5IeQSNMlqnBKSogYsMMtX7)2TbPmlnvPZ2RmCtqEwJx5PPkbf)oIMRPOVwoQVSu9oMnibUkuzmCNxDRJCvJZm7PjQdBfyhgC0vDsFMqSLRzDtClyKTUCmyqty(Ra0LeIOeAkaIIkKzcGOjBcrCU2WWse0pIycwktcL8(1Xo1IHkJvk6XvraIu0tRXlqBugtRYrEk6HeLkDxovNCsnzK2(1VEZeZOn5Aj0hDKp5iFgWIDKRzPupmCLJSWrE5fhjwPeyXkOkKDv6gh5lNK3GQ7ZLqKXC6Npto578rwnIl6aWkpzJsGD7h(LX7ZkBqjAK1j7MFcA1JUU5v9uSsRZZqRgZxnAGEB20ZbatpgTHkz9WCgyXtKh459YS38e7S5NzKfkymzeKLy1aCzRQGmMlz6Y6WSZm7NWI5P(j8U9faTe5hirF8kq639(Jzx9JAbYSRBxoBJK6VejHTLMloZMe0rpdBgKSuodWdFdq(nUxNdxb)3r4U6In2rfVwH7SR2J0Y1Vftn2ImmtZGNV2qpto6l3WKxevdf8EGTA5dLmn(4dWJwqvU46o0yD92OZaD8yebx(0jG(s5VRTHLRNozl4RTq(TcaabpZ0gun8b(ftVEoaRa6asUCNP5PC1wUaGD4FKYb2dYDoIjpltPToYwLgEVgGhAEm8OUgUGmRjWrGh3Tfg5BIW7kj4t)29uqmdc8X20eGXtrEccWyC4Li9xD37itCK)9Vminbll189laIe75X7BRnvESjQoIuHo))Ye8yUv043e8Rsohvb9xbEi6QW8yHlCKzFhDAsBrZBf5dCHO1nQ0L2kv9vdVizE6gMgdSraRwD3FxkwWqblHi47ooINGdCi0VYT7bm66)HkEYm)prSVVUhU(JF0rkL6inuarHEIBU7rnMo3rUpxcrg5QbxR7lIHjOEi6NU9Y6HHl4BVDGXMHTQ3qaA7hAgwgXMk4EDK6oymUviE3BemjmSwDa)J4OgyFRAbCqV1oxGlCUfwvHrS7UUVT4S2zA78adg4b5tHo)CuY65NrUJ(ZAiz17G(KNoTmAkrbE(mdBDnfMoDUsYtF6ZdsBA1IxEzu6sRwCZx6hQM2ttu6rhQNjv0y81YbO9SAE)ornxLktoLFZjg1qnPvpRnlME63LUs)uUMZr9L8egkNe)sgg1w0HkYW1eEjrIMO0J6XGvFpJb0KEemwD7vJ3TAJ3HPMbbtfYhRYuC67pZlS7DK6LPr1)cf(Ex4)d]] )
 
 spec:RegisterPack( "Destruction", 20230204, [[Hekili:1EvBloUnq4FlhhKV09CTDYMBlKeOh9d92wwkK(zBRylNiwzlJS8EeWOF7DKKF3YjPuklSjXAMNzMN5n5aVG)o4ycsGdEZ31FTRV7ghp3nF175GJIRf4GJfO43rNHVKJYG))B4sbVkwqy5QZUszOefgLSkEmCEWXtveQ475bNSd8Aq2cCCWB)sWXlKKeSrsCz8iWLr)aXPS43LrfCcJtexLrPmUm63XVtOKGJusPOuzAkjfdF(MowqnUwcgjUegZi0GJ4C0jkoj4BbcWBgjfhrYd1amskHcGuufv0bC)XhJbVbZjidoFGdX54mcUugTtg53JoVkp089qLZAC5qdpwk6CMhc5dYiVhdzedRGE9IqFbJOIlofXcJd)8JHRML0utbhhZYoHSsoTqLIPHiEgJBsUCsH55)6F9NYOpw7SXX9lEW)9LrFEO3DQkn1rROtc7hqDqDTmAWd54miNz4AVxCVnl(jO6blCmKzVVvwLLbHijR42m1z61IloQapuGkCAKrgTQXJ6or5P9W3(yf4BgwUvWmFoPutLXUbtwEbb4Ns1zHBwHSw7Ace)me0jqQdLhJnmLlO61yQYVuNwQmNfQRZMyCsilfAG48QMm3dyAGVfK43j5NTBUPuDR5iq(GQgwmo3DtS2SawdDzkjhhgNeCCRfmgyRm2hk7OZgL3PNpbRZ9zxdJR4L4MQui41)m8mNvva607p6hdCP4cqzuCgohS)9kBBcDt5Fct40srJBaSqHT0CpFKd1oN5A6D0OWPm4TJrlre6ml)QcPN))SfA7OO5cIvgEIbtMhhmF9FfB2xKmIp9TwgbO)Y9AJH1zdKOc4hW8zLtecAdxYlB6AfKmiWzHjevJ7Ez0wxnzLHYrMr2qZMV5zK8umpNf2rQQORbNjd53yvJbvpMd0(4sZHSplOP1zyRMcKLlUnkmjOax8fxtam6HQ5w2Qj8gvItYJbRBPc3B5sCB89Ho6(bBasySmTDwUbWAETZol4fRDVr3MEk1hyEP6yZTR88HjbWfMYbMfQ5(EwbJluveplJm4iJ03xYr(QA)nlLqbU6ZYiBRJLVA0P0PBt)pT)N7wO)ejD)KT011Z3qVd2oBhP(1VkO(u)gA7I3M3vcBFCYQ5JsSdLPZv(QmQ5VwPGZMC3NNu36zp8jy1X7725Fx1Gn6Z17G3D1tfckf77E35)CVZA7BTHzPk(0lFmLSkySvfVA0AQj63UerNxAgAwxBB9ZoVjQoynZKtkzu2T9Pjk8FmHBCNU9eZ8Z2PyZdY5BfgKRnQ3wbn6HDJ7NsNMPQkdnVrF3(TURAh2DW3D1KHZ11ZgLVBZmPwo6AgiVFRY8ndDxMNnc05p7EXTUU7hEUluV1p4DQFmCcP94)ae(pqXW4XFlqLauwmWAy(tpAqpPQyS)Y0pn6gH79S0XUE1KltROIPio7QYpeWTvEtHRRf0cilPJ1SUf9BRc61xvcaa0)2YZpAWRiJQexuVq3FqG3m)lFdcMeIwA9oPG)5d]] )
 
@@ -2425,7 +2537,7 @@ spec:RegisterPackSelector( "affliction", "Affliction", "|T136145:0|t Affliction"
         return tab1 > max( tab2, tab3 )
     end )
 
-spec:RegisterPackSelector( "demonology", "Demonology (wowtbc.gg)", "|T136172:0|t Demonology",
+spec:RegisterPackSelector( "demonology", "Demonology", "|T136172:0|t Demonology",
     "If you have spent more points in |T136172:0|t Demonology than in any other tree, this priority will be automatically selected for you.",
     function( tab1, tab2, tab3 )
         return tab2 > max( tab1, tab3 )
