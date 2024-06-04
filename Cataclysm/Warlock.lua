@@ -1665,9 +1665,9 @@ spec:RegisterAbilities( {
 
     -- You transform into a Demon for 30 sec.  This form increases your armor by 600%, damage by 20%, reduces the chance you'll be critically hit by melee attacks by 6% and reduces the duration of stun and snare effects by 50%.  You gain some unique demon abilities in addition to your normal abilities. 3 minute cooldown.
     metamorphosis = {
-        id = 59672,
+        id = 47241,
         cast = 0,
-        cooldown = function() return 180 * ( 1 - ( 0.15 * talent.nemesis.rank ) ) end,
+        cooldown = 180,
         gcd = "off",
 
         startsCombat = false,
