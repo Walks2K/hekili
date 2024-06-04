@@ -1243,6 +1243,8 @@ spec:RegisterAbilities( {
         startsCombat = false,
         texture = 463284,
 
+        toggle = "cooldowns",
+
         handler = function()
             if     pet.imp.active        then applyBuff( "demon_soul_imp" )
             elseif pet.voidwalker.active then applyBuff( "demon_soul_voidwalker" )
