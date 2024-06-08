@@ -1729,6 +1729,50 @@ all:RegisterAuras( {
         aliasMode = "longest"
     },
 
+    -- Increases magic damage taken by $s1%.
+    curse_of_the_elements = {
+        id = 1490,
+        duration = 300,
+        tick_time = 2,
+        max_stack = 1,
+        shared = "target",
+    },
+
+    ebon_plaguebringer = {
+        id = 65142,
+        duration = 21,
+        max_stack = 1,
+        shared = "target"
+    },
+
+    earth_and_moon = {
+        id = 60433,
+        duration = 15,
+        max_stack = 1,
+        shared = "target"
+    },
+
+    fire_breath = {
+        id = 34889,
+        duration = 45,
+        max_stack = 1,
+        shared = "target"
+    },
+
+    master_poisoner = {
+        id = 58410,
+        duration = 3600,
+        max_stack = 1,
+        shared = "target"
+    },
+
+    -- Alias-Aura collecting all spell-damage debuffs
+    magic_vuln = {
+        alias = {"curse_of_the_elements", "ebon_plaguebringer", "earth_and_moon", "master_poisoner", "fire_breath"},
+        aliasType = "debuff",
+        aliasMode = "longest"
+    },
+
     -- Increases armor by $s1.
     mark_of_the_wild = {
         id = 79061,

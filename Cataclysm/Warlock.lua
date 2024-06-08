@@ -697,41 +697,6 @@ spec:RegisterAuras( {
         aliasMode = "first",
         aliasType = "buff"
     },
-
-    -- Spell Damage Debuffs for Curse of the Elements handler
-    -- Ebon Plaguebringer
-    ebon_plaguebringer = {
-        id = 65142,
-        duration = 21,
-        max_stack = 1,
-        shared = "target"
-    },
-    -- Earth and Moon
-    earth_and_moon = {
-        id = 60433,
-        duration = 15,
-        max_stack = 1,
-        shared = "target"
-    },
-    -- Master Poisoner
-    master_poisoner = {
-        id = 58410,
-        duration = 3600,
-        max_stack = 1,
-        shared = "target"
-    },
-    -- Fire Breath
-    fire_breath = {
-        id = 34889,
-        duration = 45,
-        max_stack = 1,
-        shared = "target"
-    },
-    spell_damage_debuffs = {
-        alias = {"curse_of_the_elements", "ebon_plaguebringer", "earth_and_moon", "master_poisoner", "fire_breath"},
-        aliasMode = "first",
-        aliasType = "debuff"
-    }
 } )
 
 
