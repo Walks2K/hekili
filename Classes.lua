@@ -2470,6 +2470,15 @@ all:RegisterAuras( {
 -- TODO: Needs Catalcysm potions
 -- TODO: Something about potions is not currently working, needs investigation.
 all:RegisterPotions( {
+    volcanic_potion = {
+        item = 58091,
+        buff = "Volcanic Power",
+        aura = {
+            id = 79476,
+            duration = 25,
+            max_stack = 1,
+        }
+    },
     speed = {
         item = 40211,
         buff = "speed",
@@ -3349,6 +3358,31 @@ all:RegisterAbilities( {
 
         handler = function()
             gain( 1800, "mana" )
+        end,
+    },
+
+    volcanic_potion = {
+        name = function() return GetItemInfo( 58091 ) end,
+        cast = 0,
+        cooldown = 60,
+        gcd = "off",
+
+        startsCombat = false,
+
+        item = 58091,
+        bagItem = true,
+
+        usable = function ()
+            return GetItemCount( 58091 ) > 0, "requires volcanic_potion in bags"
+        end,
+
+        readyTime = function ()
+            local start, duration = GetItemCooldown( 58091 )
+            return max( 0, start + duration - query_time )
+        end,
+
+        handler = function()
+            applyBuff( "volcanic_power" )
         end,
     },
 
